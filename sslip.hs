@@ -428,12 +428,52 @@ l2d _ l = error (show l)
 ---------------------------------------------------------------------------
 -- Évaluateur                                                            --
 ---------------------------------------------------------------------------
+lookupVE :: VEnv -> Int -> Value
+lookupVE env n = 
+  if n < 0 || n >= length env
+  then error ("l'index de la variable n'est pas dans l'environnement : " ++ show n)
+  else env !! n
 
 type VEnv = [Value]
 
 eval :: VEnv -> Dexp -> Value
 eval _   (Dnum n) = Vnum n
 eval _   (Dbool b) = Vbool b
+eval env (Dvar var) = lookupVE env var
+eval env (Dtest e1 e2 e3) = 
+    case eval env e1 of
+      Vbool True -> eval env e2
+      Vbool False -> eval env e3
+      _ -> error "Condition non booléenne"
+eval env (Dfob n body) = Vfob env n body
+eval env (Dsend f actuals) = 
+  let fv = eval env f  -- Évaluation de la fonction
+      actualsv = map (eval env) actuals  -- Évaluation des arguments
+  in case fv of
+      Vbuiltin bi -> bi actualsv  -- Si c'est une fonction prédéfinie, on l'applique
+      Vfob fEnv n body -> 
+        if length actualsv == n then  -- Vérifie que le nombre d'arguments est correct
+          eval (actualsv ++ fEnv) body  -- Applique la fonction avec l'environnement étendu
+        else
+          error ("Nombre d'arguments incorrect pour la fonction")
+      v -> error ("Pas une fonction: " ++ show v)  -- Si ce n'est ni une fonction prédéfinie ni un fobjet, on lève une erreur
+eval env (Dlet e1 e2) = 
+  let val1 = eval env e1  -- Évalue la première expression pour obtenir la valeur associée à la variable
+      env' = val1 : env   -- Ajoute la nouvelle variable liée à la valeur dans l'environnement
+  in eval env' e2         -- Évalue le corps `e2` avec l'environnement mis à jour
+
+eval env (Dfix decls body) = 
+  let 
+        -- Gestion des fonctions récursives
+        recEnvFob = 
+                    [Vfob newEnv index body' | Dfob index body' <- decls] 
+        -- Gestion des variables simples
+        recEnvNum = [Vnum x | Dnum x <- decls]
+        -- Combine les deux types de déclarations
+        newEnv = recEnvFob ++ recEnvNum ++ env
+    -- Evalue le corps de la fonction avec le nouvel environnement
+    in eval newEnv body  
+
 -- ¡¡COMPLÉTER ICI!!
 
 
