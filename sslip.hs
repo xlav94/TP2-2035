@@ -195,11 +195,6 @@ data Lexp = Lnum Int             -- Constante entière.
           | Lfix [(Var, Lexp)] Lexp
           deriving (Show, Eq)
 
-{-
--- Permet d'enlever le (Ssym "->")
-removeEveryOther :: [a] -> [a]
-removeEveryOther xs = [x | (i, x) <- zip [0..] xs, odd i]
--}
 
 svar2lvar :: Sexp -> Var
 svar2lvar (Ssym v) = v
@@ -240,7 +235,7 @@ s2l (Snode (Ssym "fob") [args, body])
 s2l (Snode (Ssym "let") [x, e1, e2])
   = Llet (svar2lvar x) (s2l e1) (s2l e2)
 
-s2l (Snode (Ssym "fix") [decls, body])
+s2l (Snode (Ssym "fix") (decls : body))
   = let sdecl2ldecl :: Sexp -> (Var, Lexp)
         sdecl2ldecl (Snode (Ssym v) [e]) = (v, (s2l e))
         sdecl2ldecl (Snode (Ssym v) [t, e]) = (v, Ltype (s2l e) (evalType t))
@@ -249,7 +244,11 @@ s2l (Snode (Ssym "fix") [decls, body])
         sdecl2ldecl (Snode (Snode (Ssym v) args) [t, e])
           = (v, Lfob (map varType args) (Ltype (s2l e) (evalType t)))
         sdecl2ldecl se = error ("Declation Psil inconnue in fix: " ++ showSexp se)
-    in Lfix (map sdecl2ldecl (s2list decls)) (s2l body)
+
+        {- isDeclComplete = if length body == 1 
+          then Lfix (map sdecl2ldecl (s2list decls)) (s2l (head body))
+          else Lfix (map sdecl2ldecl (s2list decls)) (Ltype (s2l (last body)) (evalType (head body))) -}
+    in Lfix (map sdecl2ldecl (s2list decls)) (s2l (head body))
 
 s2l (Snode f args)
   = Lsend (s2l f) (map s2l args)
@@ -309,6 +308,66 @@ type TEnv = [(Var, Type)]
 check :: Bool -> TEnv -> Lexp -> Type
 check _ _ (Lnum _) = Tnum
 check _ _ (Lbool _) = Tbool
+check _ env (Lvar x) = case lookup x env of
+                         Just t -> t
+                         Nothing -> Terror ("Variable inconnue: " ++ x)
+check strict env (Ltype e t) =
+    let inferredType = check strict env e
+    in if strict && inferredType /= t
+       then Terror ("expected type : " ++ show t ++ ", actual type: " ++ show inferredType)
+       else t
+check strict env (Ltest e1 e2 e3) = 
+    let t1 = check strict env e1
+        t2 = check strict env e2
+        t3 = check strict env e3
+    in if strict && t1 /= Tbool
+       then Terror ("expected Bool, actual: " ++ show t1)
+       else if strict && t2 /= t3
+            then Terror "Branches have different types"
+            else t2
+
+check strict env (Lsend e0 args) =
+    let funcType = check strict env e0
+        argTypes = map (check strict env) args
+    in case funcType of
+        Tfob paramTypes returnType ->
+            if length paramTypes /= length argTypes
+            then Terror "Nombre incorrect d'arguments"
+            else if strict && or (zipWith (/=) paramTypes argTypes)
+                 then Terror "Types des arguments incompatibles"
+                 else returnType
+        _ -> Terror "L'expression n'est pas une fonction"
+
+check strict env (Lfob params body) =
+    let extendedEnv = foldl (\acc (x, t) -> (x, t) : acc) env params
+        bodyType = check strict extendedEnv body
+        paramTypes = map snd params
+    in if bodyType == Terror "Type inconnu"
+       then Terror "Erreur dans le corps du fobjet"
+       else Tfob paramTypes bodyType
+
+check strict env (Llet x e1 e2) =
+    let t1 = check strict env e1
+        extendedEnv = (x, t1) : env
+        t2 = check strict extendedEnv e2
+    in t2
+
+check strict env (Lfix bindings body) =
+    let -- Étape 1 : Deviner les types des `ei` en mode non-strict
+        paramNames = map fst bindings
+        initialEnv = [(x, Terror "Type inconnu") | x <- paramNames] ++ env
+        guessedTypes = map (check False initialEnv . snd) bindings
+        
+        -- Étape 2 : Construire Γ′ avec les types devinés
+        extendedEnv = zip paramNames guessedTypes ++ env
+        
+        -- Étape 3 : Vérifier les `ei` en mode strict
+        checkedTypes = map (check strict extendedEnv . snd) bindings
+        
+    in if strict && or (zipWith (/=) guessedTypes checkedTypes)
+       then Terror "Types incoherents dans les definitions recursives"
+       else check strict extendedEnv body
+
 -- ¡¡COMPLÉTER ICI!!
 
 ---------------------------------------------------------------------------
@@ -348,6 +407,22 @@ l2d :: TEnv -> Lexp -> Dexp
 l2d _ (Lnum n) = Dnum n
 l2d _ (Lbool b) = Dbool b
 l2d tenv (Lvar v) = Dvar (lookupDI tenv v 0)
+l2d tenv (Ltype e _) = l2d tenv e
+l2d tenv (Ltest e1 e2 e3) = Dtest (l2d tenv e1) (l2d tenv e2) (l2d tenv e3)
+l2d tenv (Lfob params body) = 
+    -- Ajout des paramètres de la fonction à l'environnement
+    let newEnv = [(x, t) | (x, t) <- params] ++ tenv
+    in Dfob (length params) (l2d newEnv body)  -- Convertir le corps avec le nouvel environnement
+l2d tenv (Llet var e1 e2) = 
+    let newEnv = (var, Terror "Type inconnu") : tenv
+    in Dlet (l2d tenv e1) (l2d newEnv e2)
+l2d tenv (Lsend f args) = Dsend (l2d tenv f) (map (l2d tenv) args)
+l2d tenv (Lfix bindings body) = 
+    let paramNames = map fst bindings
+        newEnv = [(x, Terror "Type inconnu") | x <- paramNames] ++ tenv
+    in Dfix (map (l2d newEnv . snd) bindings) (l2d newEnv body)
+
+l2d _ l = error (show l)
 -- ¡¡COMPLÉTER ICI!!
 
 ---------------------------------------------------------------------------
