@@ -195,10 +195,64 @@ data Lexp = Lnum Int             -- Constante entière.
           | Lfix [(Var, Lexp)] Lexp
           deriving (Show, Eq)
 
+{-
+-- Permet d'enlever le (Ssym "->")
+removeEveryOther :: [a] -> [a]
+removeEveryOther xs = [x | (i, x) <- zip [0..] xs, odd i]
+-}
+
+svar2lvar :: Sexp -> Var
+svar2lvar (Ssym v) = v
+svar2lvar se = error ("Pas un symbole: " ++ showSexp se)
+
+-- Permet d'evluer le type d'une variable.
+varType :: Sexp -> (Var, Type)
+varType (Snode (Ssym v) [t]) = (v, evalType t)
+varType se = error ("Pas un symbole: " ++ showSexp se)
+
+s2list :: Sexp -> [Sexp]
+s2list Snil = []
+s2list (Snode se1 ses) = se1 : ses
+s2list se = error ("Pas une liste: " ++ showSexp se)
+
+evalType :: Sexp -> Type
+evalType (Ssym "Num") = Tnum
+evalType (Ssym "Bool") = Tbool
+evalType (Snode t1 []) = evalType t1
+evalType (Snode t1 rest) = 
+    let t2 = last rest
+        t3 = init (init rest)
+    in Tfob (evalType t1 : map evalType t3) (evalType t2)
+evalType _ = Terror "Type inconnu"
+
 -- Première passe simple qui analyse une Sexp et construit une Lexp équivalente.
 s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
 s2l (Ssym s) = Lvar s
+s2l (Snode (Ssym ":") [e,t]) = Ltype (s2l e) (evalType t)
+s2l (Snode (Ssym n) [Ssym t]) = Ltype (s2l (Ssym n)) (evalType (Ssym t))
+s2l (Snode (Ssym "if") [e1, e2, e3])
+  = Ltest (s2l e1) (s2l e2) (s2l e3)
+
+s2l (Snode (Ssym "fob") [args, body])
+    = Lfob (map varType (s2list args)) (s2l body)
+
+s2l (Snode (Ssym "let") [x, e1, e2])
+  = Llet (svar2lvar x) (s2l e1) (s2l e2)
+
+s2l (Snode (Ssym "fix") [decls, body])
+  = let sdecl2ldecl :: Sexp -> (Var, Lexp)
+        sdecl2ldecl (Snode (Ssym v) [e]) = (v, (s2l e))
+        sdecl2ldecl (Snode (Ssym v) [t, e]) = (v, Ltype (s2l e) (evalType t))
+        sdecl2ldecl (Snode (Snode (Ssym v) args) [e])
+          = (v, Lfob (map varType args) (s2l e))
+        sdecl2ldecl (Snode (Snode (Ssym v) args) [t, e])
+          = (v, Lfob (map varType args) (Ltype (s2l e) (evalType t)))
+        sdecl2ldecl se = error ("Declation Psil inconnue in fix: " ++ showSexp se)
+    in Lfix (map sdecl2ldecl (s2list decls)) (s2l body)
+
+s2l (Snode f args)
+  = Lsend (s2l f) (map s2l args)
 -- ¡¡COMPLÉTER ICI!!
 s2l se = error ("Expression Psil inconnue: " ++ showSexp se)
 
