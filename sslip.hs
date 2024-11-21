@@ -289,8 +289,8 @@ env0 = let binop f op =
            ("-", intbin,  binop Vnum (-)),
            ("<", boolbin, binop Vbool (<)),
            (">", boolbin, binop Vbool (>)),
-           ("≤", boolbin, binop Vbool (<=)),
-           ("≥", boolbin, binop Vbool (>=)),
+           ("<=", boolbin, binop Vbool (<=)),
+           (">=", boolbin, binop Vbool (>=)),
            ("=", boolbin, binop Vbool (==)),
            ("true",  Tbool, Vbool True),
            ("false", Tbool, Vbool False)]
