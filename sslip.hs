@@ -14,7 +14,6 @@
 import Text.ParserCombinators.Parsec -- Bibliothèque d'analyse syntaxique.
 import Data.Char                -- Conversion de Chars de/vers Int et autres.
 import System.IO                -- Pour stdout, hPutStr
-
 ---------------------------------------------------------------------------
 -- La représentation interne des expressions de notre language           --
 ---------------------------------------------------------------------------
@@ -195,7 +194,7 @@ data Lexp = Lnum Int             -- Constante entière.
           | Lfix [(Var, Lexp)] Lexp
           deriving (Show, Eq)
 
-
+-- Transforme une variable Sexp en Var.
 svar2lvar :: Sexp -> Var
 svar2lvar (Ssym v) = v
 svar2lvar se = error ("Pas un symbole: " ++ showSexp se)
@@ -205,15 +204,20 @@ varType :: Sexp -> (Var, Type)
 varType (Snode (Ssym v) [t]) = (v, evalType t)
 varType se = error ("Pas un symbole: " ++ showSexp se)
 
+-- Permet de transformer une des expressions imbriqué en liste.
 s2list :: Sexp -> [Sexp]
 s2list Snil = []
 s2list (Snode se1 ses) = se1 : ses
 s2list se = error ("Pas une liste: " ++ showSexp se)
 
+-- Permet d'évaluer le type d'une expression.
 evalType :: Sexp -> Type
 evalType (Ssym "Num") = Tnum
 evalType (Ssym "Bool") = Tbool
 evalType (Snode t1 []) = evalType t1
+-- Type d'une fonction sans arguments.
+evalType (Snode (Ssym "->") [Ssym t]) = Tfob [] (evalType (Ssym t))
+-- Type d'une fonction avec arguments.
 evalType (Snode t1 rest) = 
     let t2 = last rest
         t3 = init (init rest)
@@ -237,13 +241,19 @@ s2l (Snode (Ssym "let") [x, e1, e2])
 
 s2l (Snode (Ssym "fix") (decls : body))
   = let sdecl2ldecl :: Sexp -> (Var, Lexp)
+        -- Declaration de variable simple
         sdecl2ldecl (Snode (Ssym v) [e]) = (v, (s2l e))
+        -- Declaration typée
         sdecl2ldecl (Snode (Ssym v) [t, e]) = (v, Ltype (s2l e) (evalType t))
+        sdecl2ldecl (Snode (Snode (Ssym v) args) [])
+          = error ("Pas de corps pour la déclaration: " ++ v)
+        -- Declaration de fonction
         sdecl2ldecl (Snode (Snode (Ssym v) args) [e])
           = (v, Lfob (map varType args) (s2l e))
+        -- Declaration complète
         sdecl2ldecl (Snode (Snode (Ssym v) args) [t, e])
           = (v, Lfob (map varType args) (Ltype (s2l e) (evalType t)))
-        sdecl2ldecl se = error ("Declation Psil inconnue in fix: " ++ showSexp se)
+        sdecl2ldecl se = error ("Declation Psil inconnue in fix: " ++ show se)
 
         {- isDeclComplete = if length body == 1 
           then Lfix (map sdecl2ldecl (s2list decls)) (s2l (head body))
@@ -252,7 +262,7 @@ s2l (Snode (Ssym "fix") (decls : body))
 
 s2l (Snode f args)
   = Lsend (s2l f) (map s2l args)
--- ¡¡COMPLÉTER ICI!!
+
 s2l se = error ("Expression Psil inconnue: " ++ showSexp se)
 
 ---------------------------------------------------------------------------
@@ -309,33 +319,38 @@ check :: Bool -> TEnv -> Lexp -> Type
 check _ _ (Lnum _) = Tnum
 check _ _ (Lbool _) = Tbool
 check _ env (Lvar x) = case lookup x env of
-                         Just t -> t
-                         Nothing -> Terror ("Variable inconnue: " ++ x)
+                        Just t -> t
+                        Nothing -> Terror ("Variable inconnue: " ++ x)
+
 check strict env (Ltype e t) =
     let inferredType = check strict env e
     in if strict && inferredType /= t
-       then Terror ("expected type : " ++ show t ++ ", actual type: " ++ show inferredType)
-       else t
+      then Terror ("type attendu : " ++ show t 
+                  ++ ", type actuel: " ++ show inferredType)
+      else t
+
 check strict env (Ltest e1 e2 e3) = 
     let t1 = check strict env e1
         t2 = check strict env e2
         t3 = check strict env e3
     in if strict && t1 /= Tbool
-       then Terror ("expected Bool, actual: " ++ show t1)
-       else if strict && t2 /= t3
-            then Terror "Branches have different types"
+      then Terror ("attendu Bool, actuel: " ++ show t1)
+      else if strict && t2 /= t3
+            then Terror "Les branches ont des types différents"
             else t2
 
 check strict env (Lsend e0 args) =
-    let funcType = check strict env e0
+    let funcType = if null args
+                    then Tfob [] (check strict env e0) 
+                    else check strict env e0
         argTypes = map (check strict env) args
     in case funcType of
         Tfob paramTypes returnType ->
             if length paramTypes /= length argTypes
             then Terror "Nombre incorrect d'arguments"
             else if strict && or (zipWith (/=) paramTypes argTypes)
-                 then Terror "Types des arguments incompatibles"
-                 else returnType
+                then Terror "Types des arguments incompatibles"
+                else returnType
         _ -> Terror "L'expression n'est pas une fonction"
 
 check strict env (Lfob params body) =
@@ -343,8 +358,8 @@ check strict env (Lfob params body) =
         bodyType = check strict extendedEnv body
         paramTypes = map snd params
     in if bodyType == Terror "Type inconnu"
-       then Terror "Erreur dans le corps du fobjet"
-       else Tfob paramTypes bodyType
+      then Terror "Erreur dans le corps du fobjet"
+      else Tfob paramTypes bodyType
 
 check strict env (Llet x e1 e2) =
     let t1 = check strict env e1
@@ -365,10 +380,8 @@ check strict env (Lfix bindings body) =
         checkedTypes = map (check strict extendedEnv . snd) bindings
         
     in if strict && or (zipWith (/=) guessedTypes checkedTypes)
-       then Terror "Types incoherents dans les definitions recursives"
-       else check strict extendedEnv body
-
--- ¡¡COMPLÉTER ICI!!
+      then Terror "Types incoherents dans les definitions recursives"
+      else check strict extendedEnv body
 
 ---------------------------------------------------------------------------
 -- Pré-évaluation
@@ -412,7 +425,8 @@ l2d tenv (Ltest e1 e2 e3) = Dtest (l2d tenv e1) (l2d tenv e2) (l2d tenv e3)
 l2d tenv (Lfob params body) = 
     -- Ajout des paramètres de la fonction à l'environnement
     let newEnv = [(x, t) | (x, t) <- params] ++ tenv
-    in Dfob (length params) (l2d newEnv body)  -- Convertir le corps avec le nouvel environnement
+    -- Convertir le corps avec le nouvel environnement
+    in Dfob (length params) (l2d newEnv body) 
 l2d tenv (Llet var e1 e2) = 
     let newEnv = (var, Terror "Type inconnu") : tenv
     in Dlet (l2d tenv e1) (l2d newEnv e2)
@@ -423,7 +437,6 @@ l2d tenv (Lfix bindings body) =
     in Dfix (map (l2d newEnv . snd) bindings) (l2d newEnv body)
 
 l2d _ l = error (show l)
--- ¡¡COMPLÉTER ICI!!
 
 ---------------------------------------------------------------------------
 -- Évaluateur                                                            --
@@ -431,7 +444,8 @@ l2d _ l = error (show l)
 lookupVE :: VEnv -> Int -> Value
 lookupVE env n = 
   if n < 0 || n >= length env
-  then error ("l'index de la variable n'est pas dans l'environnement : " ++ show n)
+  then error ("l'index de la variable n'est pas dans l'environnement : " 
+              ++ show n)
   else env !! n
 
 type VEnv = [Value]
@@ -450,17 +464,24 @@ eval env (Dsend f actuals) =
   let fv = eval env f  -- Évaluation de la fonction
       actualsv = map (eval env) actuals  -- Évaluation des arguments
   in case fv of
-      Vbuiltin bi -> bi actualsv  -- Si c'est une fonction prédéfinie, on l'applique
+      -- Si c'est une fonction prédéfinie, on l'applique
+      Vbuiltin bi -> bi actualsv  
       Vfob fEnv n body -> 
-        if length actualsv == n then  -- Vérifie que le nombre d'arguments est correct
-          eval (actualsv ++ fEnv) body  -- Applique la fonction avec l'environnement étendu
+        -- Vérifie que le nombre d'arguments est correct
+        if length actualsv == n then
+          -- Applique la fonction avec l'environnement étendu  
+          eval (actualsv ++ fEnv) body  
         else
           error ("Nombre d'arguments incorrect pour la fonction")
-      v -> error ("Pas une fonction: " ++ show v)  -- Si ce n'est ni une fonction prédéfinie ni un fobjet, on lève une erreur
+      -- Si ce n'est ni une fonction prédéfinie ni un fobjet, on lève une erreur
+      v -> error ("Pas une fonction: " ++ show v)  
 eval env (Dlet e1 e2) = 
-  let val1 = eval env e1  -- Évalue la première expression pour obtenir la valeur associée à la variable
-      env' = val1 : env   -- Ajoute la nouvelle variable liée à la valeur dans l'environnement
-  in eval env' e2         -- Évalue le corps `e2` avec l'environnement mis à jour
+  -- Évalue la première expression pour obtenir la valeur associée à la variable
+  let val1 = eval env e1
+  -- Ajoute la nouvelle variable liée à la valeur dans l'environnement  
+      env' = val1 : env
+  -- Évalue le corps `e2` avec l'environnement mis à jour  
+  in eval env' e2         
 
 eval env (Dfix decls body) = 
   let 
@@ -473,9 +494,6 @@ eval env (Dfix decls body) =
         newEnv = recEnvFob ++ recEnvNum ++ env
     -- Evalue le corps de la fonction avec le nouvel environnement
     in eval newEnv body  
-
--- ¡¡COMPLÉTER ICI!!
-
 
 ---------------------------------------------------------------------------
 -- Toplevel                                                              --

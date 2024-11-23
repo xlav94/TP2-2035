@@ -1,2 +1,7 @@
 (fix ((x Num 2) (y 3))(+ x y))
+
 (fix (((fact (n Num)) (Num) (if (> n 0) (* n (fact (- n 1))) 1))) (fact 5))
+
+((: (fob ((x Num) (y Num) (z Num)) (+ z (+ x y))) (Num Num Num -> Num)) 1 2 3)
+((: (fob () (+ 2 2)) (-> Num)))
+
