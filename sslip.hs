@@ -23,7 +23,6 @@ data Sexp = Snil                        -- La liste vide
           | Snode Sexp [Sexp]           -- Une liste non vide
           -- Génère automatiquement un pretty-printer et une fonction de
           -- comparaison structurelle.
-          deriving (Show, Eq)
 
 -- Exemples:
 -- (+ 2 3) ==> Snode (Ssym "+")
@@ -157,10 +156,10 @@ showSexp' (Snode h t) =
 -- On peut utiliser notre pretty-printer pour la fonction générique "show"
 -- (utilisée par la boucle interactive de GHCi).  Mais avant de faire cela,
 -- il faut enlever le "deriving Show" dans la déclaration de Sexp.
-{-
+
 instance Show Sexp where
     showsPrec p = showSexp'
--}
+
 
 -- Pour lire et imprimer des Sexp plus facilement dans la boucle interactive
 -- de Hugs/GHCi:
@@ -179,7 +178,7 @@ data Type = Terror String        -- Utilisé quand le type n'est pas connu.
           | Tnum                 -- Type des nombres entiers.
           | Tbool                -- Type des booléens.
           | Tfob [Type] Type     -- Type des fobjets.
-          deriving (Show, Eq)
+          deriving  Eq
 
 data Lexp = Lnum Int             -- Constante entière.
           | Lbool Bool           -- Constante Booléenne.
@@ -193,6 +192,36 @@ data Lexp = Lnum Int             -- Constante entière.
           -- mutuellement récursives.
           | Lfix [(Var, Lexp)] Lexp
           deriving (Show, Eq)
+
+instance Show Type where
+    show (Terror msg) = msg
+    show Tnum = "Num"
+    show Tbool = "Bool"
+    show (Tfob paramTypes returnType) =
+        let paramStr = if null paramTypes
+                      then "-> "
+                      else unwords (map show paramTypes) ++ " -> "
+        in "(" ++ paramStr ++ show returnType ++ ")"
+
+showVar :: Var -> String
+showVar v = v
+
+showLexp :: Lexp -> String
+showLexp (Lnum n) = show n
+showLexp (Lbool b) = show b
+showLexp (Lvar v) = showVar v
+showLexp (Ltype e t) = "(: " ++ showLexp e ++ " " ++ show t ++ ")"
+showLexp (Ltest e1 e2 e3) = "(if " ++ showLexp e1 ++ " " ++ showLexp e2
+                            ++ " " ++ showLexp e3 ++ ")"
+showLexp (Lfob params body) = 
+    let showParam = unwords ["(" ++ showVar v ++ " " ++ show t ++ ")" | (v, t) <- params]
+    in "(fob (" ++ showParam ++ ") " ++ showLexp body ++ ")"
+showLexp (Lsend f args) = "(" ++ showLexp f ++ " " ++ unwords (map showLexp args) ++ ")"
+showLexp (Llet x e1 e2) = "(let " ++ showVar x ++ " " ++ showLexp e1 ++ " " ++ showLexp e2 ++ ")"
+showLexp (Lfix bindings body) = 
+    let showBinding (v, e) = "(" ++ showVar v ++ " " ++ showLexp e ++ ")"
+    in "(fix (" ++ unwords (map showBinding bindings) ++ ") " ++ showLexp body ++ ")"
+  
 
 -- Transforme une variable Sexp en Var.
 svar2lvar :: Sexp -> Var
@@ -222,7 +251,7 @@ evalType (Snode t1 rest) =
     let t2 = last rest
         t3 = init (init rest)
     in Tfob (evalType t1 : map evalType t3) (evalType t2)
-evalType _ = Terror "Type inconnu"
+evalType otherType = Terror (show otherType)
 
 -- Première passe simple qui analyse une Sexp et construit une Lexp équivalente.
 s2l :: Sexp -> Lexp
@@ -325,8 +354,9 @@ check _ env (Lvar x) = case lookup x env of
 check strict env (Ltype e t) =
     let inferredType = check strict env e
     in if strict && inferredType /= t
-      then Terror ("type attendu : " ++ show t 
-                  ++ ", type actuel: " ++ show inferredType)
+      then Terror ("Type error: type attendu : " ++ show t 
+                  ++ ", type actuel: " ++ show inferredType ++ 
+                  ", dans l'expression: " ++ showLexp (Ltype e t))
       else t
 
 check strict env (Ltest e1 e2 e3) = 
@@ -334,9 +364,12 @@ check strict env (Ltest e1 e2 e3) =
         t2 = check strict env e2
         t3 = check strict env e3
     in if strict && t1 /= Tbool
-      then Terror ("attendu Bool, actuel: " ++ show t1)
+      then Terror  ("Type error: Type attendu pour la condition : Bool, type actuel : " 
+                  ++ show t1 ++ "dans l'expression: " ++ showLexp e1)
       else if strict && t2 /= t3
-            then Terror "Les branches ont des types différents"
+            then Terror ("Type error: Les branches ont des types differents : " ++ 
+                  show t2 ++ " et " ++ show t3 ++
+                  ", dans l'expression: " ++ showLexp (Ltest e1 e2 e3))
             else t2
 
 check strict env (Lsend e0 args) =
@@ -347,18 +380,18 @@ check strict env (Lsend e0 args) =
     in case funcType of
         Tfob paramTypes returnType ->
             if length paramTypes /= length argTypes
-            then Terror "Nombre incorrect d'arguments"
+            then Terror "Type error: Nombre incorrect d'arguments"
             else if strict && or (zipWith (/=) paramTypes argTypes)
-                then Terror "Types des arguments incompatibles"
+                then Terror (show returnType)
                 else returnType
-        _ -> Terror "L'expression n'est pas une fonction"
+        other -> Terror (show other)
 
 check strict env (Lfob params body) =
     let extendedEnv = foldl (\acc (x, t) -> (x, t) : acc) env params
         bodyType = check strict extendedEnv body
         paramTypes = map snd params
     in if bodyType == Terror "Type inconnu"
-      then Terror "Erreur dans le corps du fobjet"
+      then Terror "Type error: Erreur dans le corps du fobjet"
       else Tfob paramTypes bodyType
 
 check strict env (Llet x e1 e2) =
@@ -380,7 +413,9 @@ check strict env (Lfix bindings body) =
         checkedTypes = map (check strict extendedEnv . snd) bindings
         
     in if strict && or (zipWith (/=) guessedTypes checkedTypes)
-      then Terror "Types incoherents dans les definitions recursives"
+      then let showBinding (v, e) = "(" ++ showVar v ++ " " ++ showLexp e ++ ")"
+        in Terror ("Type error: Types incoherents dans l'expression: " ++ "(" ++
+        unwords (map showBinding bindings) ++ ")" )
       else check strict extendedEnv body
 
 ---------------------------------------------------------------------------
