@@ -477,7 +477,7 @@ l2d tenv (Lfix bindings body) =
     let paramNames = map fst bindings
         newEnv = [(x, Terror "Type inconnu") | x <- paramNames] ++ tenv
     in Dfix (map (l2d newEnv . snd) bindings) (l2d newEnv body)
-
+    
 l2d _ l = error (show l)
 
 ---------------------------------------------------------------------------
@@ -526,14 +526,12 @@ eval env (Dlet e1 e2) =
   in eval env' e2         
 
 eval env (Dfix decls body) = 
-  let 
-        -- Gestion des fonctions récursives
-        recEnvFob = 
-                    [Vfob newEnv index body' | Dfob index body' <- decls] 
-        -- Gestion des variables simples
-        recEnvNum = [Vnum x | Dnum x <- decls]
-        -- Combine les deux types de déclarations
-        newEnv = recEnvFob ++ recEnvNum ++ env
+  let   
+        recEnv decl = case decl of
+          (Dfob n body') -> Vfob newEnv n body'
+          (Dnum n) -> Vnum n
+          _ -> error ("Pas une fonction" ++ show decl)
+        newEnv = map recEnv decls ++ env
     -- Evalue le corps de la fonction avec le nouvel environnement
     in eval newEnv body  
 
