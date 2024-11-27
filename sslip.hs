@@ -527,11 +527,7 @@ eval env (Dlet e1 e2) =
 
 eval env (Dfix decls body) = 
   let   
-        recEnv decl = case decl of
-          (Dfob n body') -> Vfob newEnv n body'
-          (Dnum n) -> Vnum n
-          _ -> error ("Pas une fonction" ++ show decl)
-        newEnv = map recEnv decls ++ env
+        newEnv = map (eval newEnv) decls ++ env
     -- Evalue le corps de la fonction avec le nouvel environnement
     in eval newEnv body  
 
