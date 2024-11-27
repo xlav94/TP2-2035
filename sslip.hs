@@ -21,6 +21,7 @@ data Sexp = Snil                        -- La liste vide
           | Ssym String                 -- Un symbole
           | Snum Int                    -- Un entier
           | Snode Sexp [Sexp]           -- Une liste non vide
+          deriving (Show, Eq)
           -- Génère automatiquement un pretty-printer et une fonction de
           -- comparaison structurelle.
 
@@ -157,8 +158,11 @@ showSexp' (Snode h t) =
 -- (utilisée par la boucle interactive de GHCi).  Mais avant de faire cela,
 -- il faut enlever le "deriving Show" dans la déclaration de Sexp.
 
+{-
 instance Show Sexp where
     showsPrec p = showSexp'
+-}
+
 
 
 -- Pour lire et imprimer des Sexp plus facilement dans la boucle interactive
@@ -390,7 +394,7 @@ check strict env (Lfob params body) =
     let extendedEnv = foldl (\acc (x, t) -> (x, t) : acc) env params
         bodyType = check strict extendedEnv body
         paramTypes = map snd params
-    in if bodyType == Terror "Type inconnu"
+    in if bodyType == Terror "Type inconnu"  && strict
       then Terror "Type error: Erreur dans le corps du fobjet"
       else Tfob paramTypes bodyType
 
@@ -402,15 +406,21 @@ check strict env (Llet x e1 e2) =
 
 check strict env (Lfix bindings body) =
     let -- Étape 1 : Deviner les types des `ei` en mode non-strict
-        paramNames = map fst bindings
-        initialEnv = [(x, Terror "Type inconnu") | x <- paramNames] ++ env
-        guessedTypes = map (check False initialEnv . snd) bindings
-        
-        -- Étape 2 : Construire Γ′ avec les types devinés
-        extendedEnv = zip paramNames guessedTypes ++ env
+        inferTypes :: [(Var, Lexp)] -> TEnv -> (TEnv, [Type])
+        inferTypes [] accEnv = (accEnv, [])
+        inferTypes ((name, exp) : rest) accEnv =
+            let guessedType = check False accEnv exp
+                newEnv = (name, guessedType) : accEnv
+                (finalEnv, restTypes) = inferTypes rest newEnv
+            in (finalEnv, guessedType : restTypes)
+
+        -- Étape 2 : Utiliser cette fonction pour deviner les types
+        (updatedEnv, guessedTypes) = inferTypes bindings env
+
+        -- Étape 3 : Vérifier les types en mode strict
+        checkedTypes = map (check strict updatedEnv . snd) bindings
         
         -- Étape 3 : Vérifier les `ei` en mode strict
-        checkedTypes = map (check strict extendedEnv . snd) bindings
 
         differentType = [x | x <- guessedTypes, x `notElem` checkedTypes]
         
@@ -423,7 +433,7 @@ check strict env (Lfix bindings body) =
         in Terror ("Type error: types incoherents '" ++ 
         showType differentType ++ "' dans l'expression: " ++ "(" ++
         unwords (map showBinding bindings) ++ ")" )
-      else check strict extendedEnv body
+      else check strict updatedEnv body
 
 ---------------------------------------------------------------------------
 -- Pré-évaluation
