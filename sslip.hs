@@ -411,10 +411,17 @@ check strict env (Lfix bindings body) =
         
         -- Étape 3 : Vérifier les `ei` en mode strict
         checkedTypes = map (check strict extendedEnv . snd) bindings
+
+        differentType = [x | x <- guessedTypes, x `notElem` checkedTypes]
         
     in if strict && or (zipWith (/=) guessedTypes checkedTypes)
-      then let showBinding (v, e) = "(" ++ showVar v ++ " " ++ showLexp e ++ ")"
-        in Terror ("Type error: Types incoherents dans l'expression: " ++ "(" ++
+      then let
+            -- Convertit les déclaration en chaîne de caractères 
+            showBinding (v, e) = "(" ++ showVar v ++ " " ++ showLexp e ++ ")"
+            -- Convertit les types en chaîne de caractères
+            showType t = unwords (map show t)
+        in Terror ("Type error: types incoherents '" ++ 
+        showType differentType ++ "' dans l'expression: " ++ "(" ++
         unwords (map showBinding bindings) ++ ")" )
       else check strict extendedEnv body
 
