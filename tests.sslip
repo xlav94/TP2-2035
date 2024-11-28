@@ -1,7 +1,49 @@
-(fix ((x Num 2) (y 3))(+ x y))
-
-(fix (((fact (n Num)) (Num) (if (> n 0) (* n (fact (- n 1))) 1))) (fact 5))
 
 ((: (fob ((x Num) (y Num) (z Num)) (+ z (+ x y))) (Num Num Num -> Num)) 1 2 3)
 ((: (fob () (+ 2 2)) (-> Num)))
+
+;--------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------
+;; Un let dans un let :
+(let x 5 
+     (let y 3 
+          (+ x y))) ;; => 8
+;--------------------------------------------------------------------------------
+;; Une fonction avec un booléen en tant que paramètre, et qui utilise une 
+;; variable locale :
+(let localSum 
+     (fob ((x Bool) (y Num)) 
+          (let localVal 5 
+               (if x (+ y localVal) (- y localVal)))) 
+     (localSum true 2)) ;; => 8     
+;--------------------------------------------------------------------------------
+;; Test pour des lets imbriqués dans un let, avec des fonctions, une expression
+;; conditionnelle, et opérations prédéfinies:
+(let outerFunction (fob ((x Num) (y Num)) 
+          (let innerFunction1 (fob ((a Num) (b Num)) 
+                    (* 2 (+ a b))) 
+               (let innerFunction2 (fob ((a Num) (b Num)) 
+                        (if (> a b) (* (- a b) (- a b)) (* (+ a b) (+ a b))) )
+                    (+ (innerFunction1 x y) (innerFunction2 x y))
+                       )
+                    )
+                )
+     (/(outerFunction 5 5)(outerFunction 5 3))) ;; => 6
+
+;;--------------------------------------------------------------------------------
+;;--------------------------------------------------------------------------------     
+
+(fix (
+    ((call) (+ (comp y true)(sum x y)))
+    ((sum (x Num) (y Num)) (+ x y))
+    (x Num 2) (y Num 2)
+    ((comp (y Num)(x Bool)) Num (if x (+ y 1) (- y 1)))
+       ) 
+(call)) ;; => 7
+
+
+
+
+
+
 
