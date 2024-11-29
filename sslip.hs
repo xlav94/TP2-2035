@@ -406,21 +406,16 @@ check strict env (Llet x e1 e2) =
 
 check strict env (Lfix bindings body) =
     let -- Étape 1 : Deviner les types des `ei` en mode non-strict
-        inferTypes :: [(Var, Lexp)] -> TEnv -> (TEnv, [Type])
-        inferTypes [] accEnv = (accEnv, [])
-        inferTypes ((name, exp) : rest) accEnv =
-            let guessedType = check False accEnv exp
-                newEnv = (name, guessedType) : accEnv
-                (finalEnv, restTypes) = inferTypes rest newEnv
-            in (finalEnv, guessedType : restTypes)
-
-        -- Étape 2 : Utiliser cette fonction pour deviner les types
-        (updatedEnv, guessedTypes) = inferTypes bindings env
-
-        -- Étape 3 : Vérifier les types en mode strict
-        checkedTypes = map (check strict updatedEnv . snd) bindings
+        paramNames = map fst bindings
+        initialEnv = [(x, Terror "Type inconnu") | x <- paramNames] ++ env
+        
+        guessedTypes = map (check False initialEnv . snd) bindings
+        
+        -- Étape 2 : Construire Γ′ avec les types devinés
+        extendedEnv = zip paramNames guessedTypes ++ env
         
         -- Étape 3 : Vérifier les `ei` en mode strict
+        checkedTypes = map (check strict extendedEnv . snd) bindings
 
         differentType = [x | x <- guessedTypes, x `notElem` checkedTypes]
         
@@ -433,7 +428,7 @@ check strict env (Lfix bindings body) =
         in Terror ("Type error: types incoherents '" ++ 
         showType differentType ++ "' dans l'expression: " ++ "(" ++
         unwords (map showBinding bindings) ++ ")" )
-      else check strict updatedEnv body
+      else check strict extendedEnv body
 
 ---------------------------------------------------------------------------
 -- Pré-évaluation
