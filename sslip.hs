@@ -386,7 +386,8 @@ check strict env (Lsend e0 args) =
             if length paramTypes /= length argTypes
             then Terror "Type error: Nombre incorrect d'arguments"
             else if strict && or (zipWith (/=) paramTypes argTypes)
-                then Terror (show returnType)
+                then Terror ("Type incoherent des arguments " ++
+                      "dans l'expression:" ++ showLexp (Lsend e0 args) )
                 else returnType
         other -> Terror (show other)
 
