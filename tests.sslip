@@ -1,24 +1,32 @@
-
+;; TESTS TYPÉS CORRECTEMENT
+;; 1- Une fonction avec trois paramètres de type Num et une annotation explicite 
+;; de type (Num Num Num -> Num).
 ((: (fob ((x Num) (y Num) (z Num)) (+ z (+ x y))) (Num Num Num -> Num)) 1 2 3)
-((: (fob () (+ 2 2)) (-> Num)))
+;; => 6
 
-;--------------------------------------------------------------------------------
-;--------------------------------------------------------------------------------
-;; Un let dans un let :
+
+;; 2- Fonction sans paramètres avec son annotation de type.
+((: (fob () (+ 2 2)) (-> Num)))
+;; => 4
+
+
+;; 3- Let imbriqué pour des variables locales.
 (let x 5 
      (let y 3 
-          (+ x y))) ;; => 8
-;--------------------------------------------------------------------------------
-;; Une fonction avec un booléen en tant que paramètre, et qui utilise une 
-;; variable locale :
+          (+ x y))) 
+;; => 8
+
+
+;; 4- Fonction avec un booléen en paramètre et une condition locale.
 (let localSum 
      (fob ((x Bool) (y Num)) 
           (let localVal 5 
                (if x (+ y localVal) (- y localVal)))) 
-     (localSum true 2)) ;; => 8     
-;--------------------------------------------------------------------------------
-;; Test pour des lets imbriqués dans un let, avec des fonctions, une expression
-;; conditionnelle, et opérations prédéfinies:
+     (localSum true 2))    
+;; => 7
+
+
+;; 5- Let imbriqué avec deux fonctions et une expression conditionnelle complexe.
 (let outerFunction (fob ((x Num) (y Num)) 
           (let innerFunction1 (fob ((a Num) (b Num)) 
                     (* 2 (+ a b))) 
@@ -28,22 +36,158 @@
                        )
                     )
                 )
-     (/(outerFunction 5 5)(outerFunction 5 3))) ;; => 6
+     (/(outerFunction 5 5)(outerFunction 5 3))) 
+;; => 6
 
-;;--------------------------------------------------------------------------------
-;;--------------------------------------------------------------------------------     
 
+;; 6- Déclaration de variable simple.
 (fix (
-    ((call) (+ (comp y true)(sum x y)))
-    ((sum (x Num) (y Num)) (+ x y))
-    (x Num 2) (y Num 2)
-    ((comp (y Num)(x Bool)) Num (if x (+ y 1) (- y 1)))
+    (x 42) 
+    )
+x) 
+;; => 42
+
+
+;; 7- Déclaration typée de variable.
+(fix (
+    (y Bool true) 
+    )
+y) 
+;; => true
+
+
+;; 8- Déclaration complète d'une fonction qui prend 2 entiers en paramètres.
+(fix (
+    ((addTwo (x Num) (y Num)) Num (+ x y)) 
+    )
+(addTwo 3 5)) 
+;; => 8
+
+
+;; 9- Déclaration d'une fonction qui prend une expression conditionnelle.
+(fix (
+    ((isPositive (n Num)) Bool (if (> n 0) true false)) 
+    )
+(isPositive 3)) 
+;; => true
+
+;; 10- Déclaration d'une fonction récursive
+(fix (
+    ((fact (n Num)) Num (if (> n 0) (* n (fact (- n 1))) 1)) 
+    )
+(fact 4)) 
+;; => 24
+
+
+;; 11- Déclaration de fonction qui appelle 2 autres fonctions
+(fix (
+    ((addTwo (x Num) (y Num)) Num (+ x y)) 
+    ((isPositive (n Num)) Bool (if (> n 0) true false)) 
+    ((sumAndCheck (x Num) (y Num)) Num (if (isPositive (addTwo x y)) 1 0)) 
+    )
+(sumAndCheck 3 5)) 
+;; => 1
+
+
+;; 12- Déclaration avec un fix imbriqué
+(fix (
+    ((sumAndCheck (x Num) (y Num)) Num (if true (+ x y) 0)) 
+    ((doubleSum (a Num) (b Num)) Num 
+        (fix (
+            ((double (n Num)) Num (* n 2))) 
+            (double (sumAndCheck a b)))) 
+    )
+(doubleSum 3 5)) 
+;; => 16
+
+;; 13- Déclaration complète avec plusieurs let imbriqués
+(fix (
+    ((fact (n Num)) Num (if (> n 0) (* n (fact (- n 1))) 1)) 
+    ((addTwo (x Num) (y Num)) Num (+ x y)) 
+    ((doubleSum (a Num) (b Num)) Num 
+        (fix (
+            ((double (n Num)) Num (* n 2))) 
+            (double (addTwo a b)))) 
+    ((callAll) Num 
+        (let factResult (fact 4) 
+            (let sumResult (addTwo 3 5) 
+                (let doubledResult (doubleSum 3 5) 
+                    (+ factResult (+ sumResult doubledResult)))))) 
+    )
+(callAll)) 
+;; => 48
+
+
+;; 14- Fix avec une déclaration de variable et des fonctions imbriquées. 
+(fix (
+    (x 42) ;; Déclaration de variable
+    (y Bool true) ;; Déclaration typée de variable de type Bool
+
+    ;; Déclaration complète de fonction qui prend 2 entiers en paramètres :
+    ((addTwo (x Num) (y Num)) Num (+ x y))
+
+    ;; Déclaration de fonction qui prend une expression conditionelle :
+    ((isPositive (n Num)) Bool (if (> n 0) true false))
+
+    ;; Déclaration de fonction récursive :
+    ((fact (n Num))  (if (> n 0) (* n (fact (- n 1))) 1))
+
+    ;; Déclaration de fonction qui appelle 2 autres fonctions :
+    ((sumAndCheck (x Num) (y Num)) Num (if (isPositive (addTwo x y)) 1 0))
+
+    ;; Déclaration de fonction avec un `fix` imbriqué et un appel de fonction :
+    ((doubleSum (a Num) (b Num)) Num 
+        (fix (
+            ((double (n Num)) Num (* n 2))) 
+                (double (sumAndCheck a b))))
+
+    ;; Déclaration de fonction complète sans arguments qui prend des lets 
+    ;; imbriqués et qui fait l'appel d'autres fonctions :
+    ((callAll) Num 
+        (let factResult (fact 4) 
+            (let sumResult (addTwo 3 5)  
+                (let doubledResult (doubleSum 3 5)
+                    (+ factResult (+ sumResult doubledResult))))))
        ) 
-(call)) ;; => 7
+(callAll)) ;; 
+;; => 34
 
+;;------------------------------------------------------------------------------   
+;;------------------------------------------------------------------------------ 
 
+;; 2. TESTS AVEC ERREURS DE TYPE
 
+;; Tests avec exécution possible mais erreurs de type :
+;; 1- Déclaration incorrecte de variable dans un fix: Une variable déclarée comme 
+;; Num mais avec une valeur de type Bool.
+(fix (
+    (x Num true)
+    ((print5) 5)
+    )
+(print5))
 
+;; 2- Erreur dans le type de retour d'une fonction :
+;; La fonction retourne un Bool (true/false) alors que le type attendu est Num.
+(fix (((compare (x Num)(n Num)) Num (if (> n x) true false))) (compare 1 2))
 
+;; 3- Annotation incorrecte dans un let :
+;; La variable x est annotée comme Bool alors que sa valeur est de type Num.
+(let x (: 5 Bool) (+ x 3))  
 
+;;------------------------------------------------------------------------------ 
+
+;; Tests avec erreurs de types et évaluation impossible :
+;; 1- Condition incorrecte dans une expression if :
+;; La condition n dans if n true false doit être un Bool, mais n est de type Num.
+(fix (((isPositive (n Num)) Bool (if n true false)))(isPositive 5))
+
+;; 2- Appel de fonction avec un paramètre incorrect
+;; Une fonction qui attend deux Num est appelée avec un Bool comme premier 
+;; argument.
+(fix (((sum (x Num) (y Num)) (+ x y)))(sum true 3))
+
+;; 3- Appel de fonction avec des arguments incompatibles
+;; Une fonction qui attend deux Num est appelée avec un Bool et une variable 
+;; non définie.
+(fix (((multiply (x Num) (y Num)) Num (* x y)))(multiply true test)) 
 

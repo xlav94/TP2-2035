@@ -1,0 +1,202 @@
+\documentclass{article}
+
+\usepackage[letterpaper,top=2cm,bottom=2cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+
+% Useful packages
+\usepackage[french]{babel}
+\usepackage{graphicx}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}      % Pour les caractères spéciaux
+\usepackage{amsmath}         
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+
+\title{\textbf{Rapport du TP 2 - IFT2035}}
+\author{
+  Cédric Guévremont (20266532)\\
+  Rima Boujenane (20235550)
+}
+\date{1 décembre 2024}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    % Titre principal
+    {\Huge \textbf{Université de Montréal} \par}
+    \vspace{2cm}
+    
+    % Sous-titre
+    {\LARGE \textbf{Rapport du TP 2 - IFT2035}\par}
+    \vspace{3.5cm}
+    {\Large \textbf{Par} \par}
+
+    % Auteurs
+    {\Large Cédric Guévremont (20266532) \\ Rima Boujenane (20235550)\par}
+
+    \vspace{5cm}
+    {\Large \textbf{Travail présenté à Stefan Monier}\par}
+    {\Large dans le cadre du cours \textbf{IFT2035}\par}
+    {\Large Concepts des langages de programmation\par}
+
+    
+    \vfill
+    {\Large \textbf{1 décembre 2024}\par}
+    
+\end{titlepage}
+
+\begin{center}
+    \tableofcontents
+\end{center}
+
+\newpage
+\section{Implémentation: }
+
+\subsection{Fonctions auxiliaires à la fonction \texttt{s2l} }
+\subsubsection{Fonctions \texttt{svar2lvar}, \texttt{varType} et \texttt{s2list}}
+Les fonctions \texttt{svar2lvar}, \texttt{varType} et \texttt{s2list} ont été reprises du solutionnaire du TP1 avec quelques modifications. 
+La fonction \texttt{varType} a été ajustée pour pouvoir évaluer le type d'une variable en faisant appel à la fonction auxiliaire \texttt{evalType}, qui est une fonction plus générale dédiée à l'évaluation de type.
+
+
+\subsubsection{Fonction \texttt{evalType}}
+La fonction \texttt{evalType} prend un \texttt{Sexp} en entrée et retourne un \texttt{Type}. Elle permet d'évaluer le type d'une expression et est principalement utilisée dans la fonction \texttt{s2l}. Cette fonction est appelée lorsqu'une évaluation de type est nécessaire, notamment dans les cas suivants : 
+\begin{itemize}
+\item \textbf{Les annotations de type,}
+\item \textbf{Les déclarations de fonction où chaque paramètre est accompagné de son type,}
+\item \textbf{Les déclarations typées de variables,}
+\item \textbf{Les déclarations complètes de fonctions spécifiant les types des paramètres et le type de retour.}
+\end{itemize}
+
+
+\section{Problèmes et expérience}
+\subsection{Problème rencontré et solution apportée}
+Lors de l'implémentation, nous avons rencontré un problème pour vérifier le type des fonctions dans un \texttt{fix}, notamment lorsque des fonctions se référencent mutuellement ou dépendent d'une autre fonction déclarée plus bas. Cela entraînait des difficultés pour déterminer les types de retour sans tomber dans des dépendances circulaires ou des inférences impossibles.
+
+Pour résoudre cela, nous avons posé une question sur le forum du cours. Le professeur nous a répondu que dans certains cas, il est nécessaire que le programmeur ajoute explicitement des annotations de type. Cependant, pour des cas comme \texttt{even}/\texttt{odd}, le vérificateur de type en mode \texttt{check False} peut présumer que le code est typé correctement, et donc, dans un \texttt{if}, les deux branches auront le même type si le code respecte la règle de typage.
+
+Grâce à cette réponse, nous avons clarifié l'importance des annotations de type dans les cas ambigus et avons adopté des déclarations complètes pour les types de retour dans notre implémentation.
+
+\subsection{Progression et résultats}
+Globalement, l'implémentation s'est très bien déroulée. Nous n'avons pas rencontré de problèmes majeurs ni de mauvaises surprises. Les concepts nécessaires pour le projet étaient bien compris, ce qui nous a permis d'avancer de manière méthodique.
+
+À part quelques bugs mineurs, principalement liés à la gestion des cas particuliers et à des erreurs d'inattention, nous avons pu les repérer et les corriger rapidement grâce à une série de tests rigoureux. 
+
+De plus, notre capacité à anticiper certains défis, comme ceux liés au typage ou aux dépendances circulaires, a contribué à minimiser les imprévus.
+
+En adoptant une démarche proactive et en restant attentifs aux détails, nous avons pu livrer un travail abouti et conforme aux attentes. Cette expérience s'est avérée fluide et enrichissante.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Tests}
+Pour valider notre implémentation, nous avons conçu une suite de tests allant de cas simples à des scénarios plus complexes, tout en veillant à couvrir tous les cas et combinaisons possibles conformément à la syntaxe de SSlip.
+
+Nous avons adopté une approche similaire à celle du TP1. Les tests simples ont permis de vérifier le bon fonctionnement de base du programme, notamment des fonctions avec un seul paramètre et un minimum d’imbrications. Ensuite, nous avons introduit des scénarios plus élaborés: des fonctions imbriquées, des fonctions avec plusieurs paramètres ou même sans paramètres, afin de tester la robustesse de notre implémentation.
+
+Contrairement au TP1, où nous avions découvert des erreurs dans notre code uniquement après avoir testé des cas complexes, cette fois-ci, nous avons anticipé ces scénarios et traité ces situations dès la phase d’implémentation. Cela nous a permis de garantir une meilleure couverture des cas particuliers dès le départ.
+
+Enfin, nous avons rédigé des tests spécifiquement conçus pour être refusés par le vérificateur de types. Parmi ces derniers, certains contiennent du code dont l’exécution via eval n’échouerait pas malgré un typage incorrect, conformément aux consignes.
+
+Après cette phase de test rigoureuse, nous avons confirmé que notre code fonctionnait correctement pour tous les cas testés.
+
+ \subsection{Description des Tests}
+ \subsubsection{Tests typés correctement}
+ Ces tests ont été conçus pour vérifier que le programme fonctionne correctement dans les cas où les types des expressions respectent les règles de la grammaire et du typage de SSlip..
+
+\textbf{Test 1:}  
+   Ce test évalue la capacité du programme à gérer une fonction \texttt{fob} avec trois paramètres typés \texttt{Num} et une annotation explicite de type \texttt{(Num Num Num -> Num)}.
+
+\textbf{Test 2:} 
+   Ce test vérifie le bon fonctionnement d'une fonction \texttt{fob} sans arguments, avec une annotation de type \texttt{(-> Num)}, qui retourne une valeur calculée en interne.
+
+\textbf{Test 3:}  
+   Ce test valide l'imbrication de plusieurs \texttt{let}s pour déclarer des variables locales et effectuer une opération sur ces variables.
+
+\textbf{Test 4:}  
+   Ce test utilise une fonction \texttt{fob} avec deux paramètres (\texttt{Bool} et \texttt{Num}), imbriquée dans un \texttt{let}. La fonction déclare une variable locale et utilise une condition \texttt{if} pour retourner un résultat basé sur la valeur du paramètre booléen.
+
+\textbf{Test 5:}  
+   Ce test vérifie la gestion des fonctions imbriquées dans des \texttt{let}s ainsi que la résolution d'expressions conditionnelles complexes. 
+
+\textbf{Test 6:}
+    Ce test valide la déclaration et l'accès à une variable locale définie dans un \texttt{fix}.
+
+\textbf{Test 7:}   
+   Ce test vérifie la capacité du programme à déclarer une variable typée (dans ce cas, \texttt{Bool}) dans un \texttt{fix} et à accéder correctement à sa valeur.
+   
+\textbf{Test 8:}  
+   Ce test évalue la gestion d'une fonction déclarée dans un \texttt{fix}, prenant deux paramètres \texttt{Num} et retournant leur somme.
+
+\textbf{Test 9:} 
+   Ce test valide une fonction définie dans un \texttt{fix}, qui retourne un \texttt{Bool} en fonction d'une condition \texttt{if} basée sur un entier donné.
+
+\textbf{Test 10:}  
+   Ce test vérifie la gestion des fonctions récursives dans un \texttt{fix}, en utilisant une fonction pour calculer la factorielle d'un entier donné.
+
+\textbf{Test 11:}  
+   Ce test combine deux fonctions internes (\texttt{addTwo} et \texttt{isPositive}) dans un \texttt{fix}. Une fonction principale \texttt{sumAndCheck} retourne une valeur basée sur le résultat des appels aux deux fonctions internes.
+
+\textbf{Test 12:}  
+   Ce test évalue la gestion des \texttt{fix} imbriqués, où une fonction interne (\texttt{double}) double la valeur calculée par une autre fonction (\texttt{sumAndCheck}).
+
+\textbf{Test 13:}  
+   Ce test combine plusieurs fonctions (\texttt{fact}, \texttt{addTwo}, \texttt{doubleSum}), toutes imbriquées dans des \texttt{let}s et déclarées dans un \texttt{fix}. Il vérifie une combinaison complexe de calculs avec des résultats intermédiaires.
+
+\textbf{Test 14:}  
+   Ce test évalue un \texttt{fix} complexe contenant plusieurs déclarations: des variables, des fonctions imbriquées, des fonctions récursives, et des appels à des fonctions internes avec des \texttt{let}s et des \texttt{if}s.
+
+
+
+\subsubsection{Tests avec erreurs de types}
+\textbf{Tests avec exécution possible mais erreurs de type:}  
+\begin{itemize}
+
+\item \textbf{Test 1:}
+Une variable \texttt{x} est déclarée comme \texttt{Num} mais contient une valeur \texttt{Bool} (\texttt{true}).
+\textbf{Erreur :} Typage incorrect détecté par le vérificateur, mais l'évaluation de \texttt{print5} fonctionnerait indépendamment et retournerait 5.
+
+\item \textbf{Test 2:}
+La fonction \texttt{compare} est censée retourner un \texttt{Num} mais retourne un \texttt{Bool} (\texttt{true} ou \texttt{false}).
+\textbf{Erreur :} Incohérence entre le type de retour attendu et effectif, bien que l'évaluation fonctionnerait en ignorant le type.
+
+\item \textbf{Test 3:}
+Une variable \texttt{x} est annotée comme \texttt{Bool} mais contient un \texttt{Num} (5).
+\textbf{Erreur :} Le vérificateur de type détecte une incompatibilité entre le type annoté \texttt{Bool} et la valeur assignée \texttt{Num}, mais l'évaluation produirait 8 car l'annotation est ignorée par \texttt{eval}.
+
+\end{itemize} 
+ 
+  
+
+\textbf{Tests avec erreurs de types et évaluation impossible:}  
+\begin{itemize}
+
+\item \textbf{Test 1:}
+La fonction \texttt{isPositive} utilise une condition \texttt{if} avec un \texttt{Num} (\texttt{n}) au lieu d'un \texttt{Bool}.
+\textbf{Erreur :} La condition n'est pas un \texttt{Bool}, ce qui provoque une erreur au niveau de la vérification des types et empêche l'évaluation.
+
+\item \textbf{Test 2:}
+La fonction \texttt{sum} est appelée avec un \texttt{Bool} (\texttt{true}) comme premier argument au lieu d'un \texttt{Num}.
+\textbf{Erreur :} Le type du premier argument est incompatible, ce qui entraîne une erreur de vérification et rend l'évaluation impossible.
+
+\item \textbf{Test 3:}
+La fonction \texttt{multiply} attend deux \texttt{Num} mais est appelée avec un \texttt{Bool} (\texttt{true}) et une variable non définie (\texttt{test}).
+\textbf{Erreur :} L'un des arguments est incorrect et l'autre n'est pas défini, ce qui provoque une erreur dans la vérification des types et bloque l'évaluation.
+
+\end{itemize}
+
+\section{Autre}
+Voici le répertoire github: \href{https://github.com/xlav94/TP2-2035}{https://github.com/xlav94/TP2-2035}.
+
+
+\end{document}
