@@ -67,12 +67,60 @@ La fonction \texttt{evalType} prend un \texttt{Sexp} en entrée et retourne un \
 \item \textbf{Les déclarations complètes de fonctions spécifiant les types des paramètres et le type de retour.}
 \end{itemize}
 
+\subsection{Affichage des erreurs de typage}
+\subsection{Fonction \texttt{showLexp}}
+Cette fonction permet de prendre une expression en Lexp et de le transfomer
+en langage SSlip. Cela permet que lorsqu'on a une erreur de typage, on peut afficher
+l'expression en SSlip qui a causée l'erreur.
+
+\subsection{Fonction \texttt{showVar}}
+Cette fonction a pour même but que la fonction \texttt{showLexp} mais pour
+afficher les variables.
+
+\subsection{Création de l'instance \texttt{Show} pour les expressions \texttt{Type}}
+Si on a :
+\begin{itemize}
+   \item \texttt{Tnum} : on affiche "Num".
+   \item \texttt{Tbool} : on affiche "Bool".
+   \item \texttt{Tfob [Type, Type] Type} : on affiche "Type Type -> Type".
+   \item \texttt{Terror message} : on affiche le message d'erreur.
+\end{itemize}
+Cela permet d'avoir un affichage plus clair des erreurs de typage par rapport 
+au type dans SSlip. 
+
+\subsection{Modification du code initial}
+Dans les parties \texttt{("$\leq$", boolbin, binop Vbool (<=))} et \texttt{("$\ge$", boolbin, binop Vbool (>=))}, le code a été modifié afin d'éviter l'exception "Unexpected char". Le code devient donc : \texttt{("<=", binop Vbool (<=))} et \texttt{(">=", binop Vbool (>=))}.
+\hfill
+
 
 \section{Problèmes et expérience}
 \subsection{Problème rencontré et solution apportée}
-Lors de l'implémentation, nous avons rencontré un problème pour vérifier le type des fonctions dans un \texttt{fix}, notamment lorsque des fonctions se référencent mutuellement ou dépendent d'une autre fonction déclarée plus bas. Cela entraînait des difficultés pour déterminer les types de retour sans tomber dans des dépendances circulaires ou des inférences impossibles.
+Lors de l'implémentation, nous avons rencontré un problème pour vérifier le type des fonctions dans un \texttt{fix}, notamment lorsque des fonctions se référencent mutuellement ou dépendent d'une autre fonction déclarée plus bas :
+\begin{verbatim}
+(fix (
+   ((func (x Num) (y Bool)) (if y (+ x 1) (- x 1))))
+   ((call) (func 10 true))
+   (call)
+)
+\end{verbatim}
+Ou bien sinon à l'inverse :
+\begin{verbatim}
+(fix (
+   ((call) (fact 10 true))
+   ((fact (x Num) (y Bool)) (if y (+ x 1) (- x 1))))
+   (call)
+)
+\end{verbatim}
+Cela entraînait des difficultés pour déterminer les types de retour sans tomber dans des dépendances circulaires ou des inférences impossibles.
 
-Pour résoudre cela, nous avons posé une question sur le forum du cours. Le professeur nous a répondu que dans certains cas, il est nécessaire que le programmeur ajoute explicitement des annotations de type. Cependant, pour des cas comme \texttt{even}/\texttt{odd}, le vérificateur de type en mode \texttt{check False} peut présumer que le code est typé correctement, et donc, dans un \texttt{if}, les deux branches auront le même type si le code respecte la règle de typage.
+Pour résoudre cela, nous avons posé une question sur le forum du cours. Le professeur nous a répondu que dans certains cas, il est nécessaire que le programmeur ajoute explicitement des annotations de type. 
+Cependant, pour des cas comme \texttt{even}/\texttt{odd}, 
+\begin{verbatim}
+   (fix (((even (x Num))  (if (= x 0) true  (odd  (- x 1)))) 
+   ((odd (x Num))   (if (= x 0) false (even (- x 1))))) 
+   (odd 42))
+\end{verbatim}
+le vérificateur de type en mode \texttt{check False} peut présumer que le code est typé correctement, et donc, dans un \texttt{if}, les deux branches auront le même type si le code respecte la règle de typage.
 
 Grâce à cette réponse, nous avons clarifié l'importance des annotations de type dans les cas ambigus et avons adopté des déclarations complètes pour les types de retour dans notre implémentation.
 

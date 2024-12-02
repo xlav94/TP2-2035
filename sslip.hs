@@ -218,13 +218,17 @@ showLexp (Ltype e t) = "(: " ++ showLexp e ++ " " ++ show t ++ ")"
 showLexp (Ltest e1 e2 e3) = "(if " ++ showLexp e1 ++ " " ++ showLexp e2
                             ++ " " ++ showLexp e3 ++ ")"
 showLexp (Lfob params body) = 
-    let showParam = unwords ["(" ++ showVar v ++ " " ++ show t ++ ")" | (v, t) <- params]
+    let showParam = unwords ["(" ++ showVar v ++ " " ++ show t ++ 
+                    ")" | (v, t) <- params]
     in "(fob (" ++ showParam ++ ") " ++ showLexp body ++ ")"
-showLexp (Lsend f args) = "(" ++ showLexp f ++ " " ++ unwords (map showLexp args) ++ ")"
-showLexp (Llet x e1 e2) = "(let " ++ showVar x ++ " " ++ showLexp e1 ++ " " ++ showLexp e2 ++ ")"
+showLexp (Lsend f args) = "(" ++ showLexp f ++ " " ++ 
+                          unwords (map showLexp args) ++ ")"
+showLexp (Llet x e1 e2) = "(let " ++ showVar x ++ " " ++ showLexp e1 ++ 
+                          " " ++ showLexp e2 ++ ")"
 showLexp (Lfix bindings body) = 
     let showBinding (v, e) = "(" ++ showVar v ++ " " ++ showLexp e ++ ")"
-    in "(fix (" ++ unwords (map showBinding bindings) ++ ") " ++ showLexp body ++ ")"
+    in "(fix (" ++ unwords (map showBinding bindings) ++ ") " 
+        ++ showLexp body ++ ")"
   
 
 -- Transforme une variable Sexp en Var.
@@ -288,9 +292,6 @@ s2l (Snode (Ssym "fix") (decls : body))
           = (v, Lfob (map varType args) (Ltype (s2l e) (evalType t)))
         sdecl2ldecl se = error ("Declation Psil inconnue in fix: " ++ show se)
 
-        {- isDeclComplete = if length body == 1 
-          then Lfix (map sdecl2ldecl (s2list decls)) (s2l (head body))
-          else Lfix (map sdecl2ldecl (s2list decls)) (Ltype (s2l (last body)) (evalType (head body))) -}
     in Lfix (map sdecl2ldecl (s2list decls)) (s2l (head body))
 
 s2l (Snode f args)
@@ -368,12 +369,14 @@ check strict env (Ltest e1 e2 e3) =
         t2 = check strict env e2
         t3 = check strict env e3
     in if strict && t1 /= Tbool
-      then Terror  ("Type error: Type attendu pour la condition : Bool, type actuel : " 
-                  ++ show t1 ++ "dans l'expression: " ++ showLexp e1)
+      then Terror  ("Type error: Type attendu pour la condition" ++ 
+                    " : Bool, type actuel : " ++
+                  show t1 ++ "dans l'expression: " ++ showLexp e1)
       else if strict && t2 /= t3
-            then Terror ("Type error: Les branches ont des types differents : " ++ 
-                  show t2 ++ " et " ++ show t3 ++
-                  ", dans l'expression: " ++ showLexp (Ltest e1 e2 e3))
+            then Terror ("Type error: Les branches" ++  
+                  "ont des types differents : " ++ show t2 ++ " et " ++ 
+                  show t3 ++ ", dans l'expression: " ++ 
+                  showLexp (Ltest e1 e2 e3))
             else t2
 
 check strict env (Lsend e0 args) =
